@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   db:
-    image: postgres:15
+    image: postgres:15-alpine
     restart: always
     ports:
       - 5432:5432
@@ -14,25 +14,34 @@ services:
       - pgdata:/var/lib/postgresql
 
   osrm:
-    image: osrm/osrm-backend:latest
+    image: ghcr.io/project-osrm/osrm-backend:v5.27.1
     restart: always
     ports:
-      - 5000:5000
+      - 5001:5000
     volumes:
       - ./osrm-data:/data
+    working_dir: /data
+    entrypoint: sh
     command: >
-      sh -c "
-      if [ ! -f /data/germany-latest.osm.pbf ]; then
-        echo 'Downloading OSM data for Germany...';
-        wget -q https://download.geofabrik.de/europe/germany-latest.osm.pbf -O /data/germany-latest.osm.pbf;
+      -c "
+      echo 'Checking for OSM data...' &&
+      if [ ! -f nrw-latest.osrm.mldgr ]; then
+        echo 'Processing OSM file (this may take 10 minutes)...' &&
+        osrm-extract --profile /opt/car.lua nrw-latest.osm.pbf &&
+        echo 'Partitioning...' &&
+        osrm-partition nrw-latest.osrm &&
+        echo 'Customizing...' &&
+        osrm-customize nrw-latest.osrm;
       fi &&
-      osrm-extract -p /opt/osrm/profiles/car.lua /data/germany-latest.osm.pbf &&
-      osrm-partition /data/germany-latest.osrm &&
-      osrm-customize /data/germany-latest.osrm &&
-      osrm-routed --algorithm=mld /data/germany-latest.osrm
+      echo 'Starting OSRM server...' &&
+      osrm-routed --algorithm=mld nrw-latest.osrm
       "
-    environment:
-      - OSRM_ALGORITHM=mld
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/5000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 600s
 
 volumes:
   pgdata:
