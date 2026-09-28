@@ -1,4 +1,6 @@
 // src/lib/osrm.ts
+import { env } from '$env/dynamic/private';
+
 interface RouteResponse {
 	distance: number;
 	duration: number;
@@ -14,15 +16,13 @@ export async function getRoute(
 	endLat: number,
 	endLon: number
 ): Promise<RouteResponse> {
-	// Server-seitig (Node.js): nutze Docker-Namen
-	// Client-seitig (Browser): nutze localhost
-	const isServer = typeof window === 'undefined';
-	const host = isServer ? 'osrm' : 'localhost';
-	const port = '5000';
+	// Host/Port aus .env (lokal: localhost, im Docker-Netz: osrm)
+	const host = env.OSRM_HOST || 'localhost';
+	const port = env.OSRM_PORT || '5001';
 
 	const url = `http://${host}:${port}/route/v1/driving/${startLon},${startLat};${endLon},${endLat}?overview=full&geometries=geojson`;
 
-	console.log('[OSRM] Requesting from', isServer ? 'SERVER' : 'CLIENT', ':', url);
+	console.log('[OSRM] Requesting:', url);
 
 	try {
 		const response = await fetch(url);

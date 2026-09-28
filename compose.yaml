@@ -17,7 +17,7 @@ services:
     image: ghcr.io/project-osrm/osrm-backend:v5.27.1
     restart: always
     ports:
-      - 5000:5000
+      - 5001:5000
     volumes:
       - ./osrm-data:/data
     working_dir: /data
