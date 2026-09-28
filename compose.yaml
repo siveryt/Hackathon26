@@ -37,12 +37,44 @@ services:
       osrm-routed --algorithm=mld nrw-latest.osrm
       "
     healthcheck:
-      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/5000"]
+      test: ['CMD', 'bash', '-c', 'echo > /dev/tcp/localhost/5000']
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 600s
 
+  # Lokale Overpass-API für Gebäudedaten (NRW), baut sich beim ersten Start aus der
+  # OSRM-PBF-Datei auf (dauert je nach Rechner 30–60 Minuten, danach sofort verfügbar)
+  overpass:
+    image: wiktorn/overpass-api:latest
+    restart: always
+    ports:
+      - 12345:80
+    volumes:
+      - ./osrm-data:/osm-data:ro
+      - overpass-db:/db
+    environment:
+      OVERPASS_MODE: init
+      OVERPASS_META: 'no'
+      OVERPASS_USE_AREAS: 'false'
+      OVERPASS_STOP_AFTER_INIT: 'false'
+      OVERPASS_PLANET_URL: file:///osm-data/nrw-latest.osm.pbf
+      # Overpass importiert nur .osm.bz2 – PBF vorher mit osmium umwandeln
+      OVERPASS_PLANET_PREPROCESS: 'mv /db/planet.osm.bz2 /db/planet.osm.pbf && osmium cat -o /db/planet.osm.bz2 /db/planet.osm.pbf && rm /db/planet.osm.pbf'
+      OVERPASS_RULES_LOAD: 10
+      OVERPASS_MAX_TIMEOUT: 60
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'curl --noproxy "*" -qfg "http://localhost/api/interpreter?data=[out:json];node(1);out;" | grep -q elements'
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 3600s
+
 volumes:
   pgdata:
   osrm-data:
+  overpass-db:

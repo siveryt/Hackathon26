@@ -3,6 +3,7 @@
 	import type { RouteWithShadowResult } from '$lib/routeWithShadow';
 	import type { Map as LeafletMap, Marker, Polyline, LayerGroup } from 'leaflet';
 	import 'leaflet/dist/leaflet.css';
+	import type { PageData } from './$types';
 
 	let startLat = $state(50.9406);
 	let startLon = $state(6.9577); // Köln
@@ -35,6 +36,72 @@
 
 	let startDebounce: ReturnType<typeof setTimeout>;
 	let endDebounce: ReturnType<typeof setTimeout>;
+
+	// ---- POIs ----
+	let { data }: { data: PageData } = $props();
+
+	let poiLayer = $state<LayerGroup | null>(null);
+	let showPois = $state(true);
+
+	const categoryColors: Record<string, string> = {
+		general: '#3b82f6',
+		restaurant: '#f97316',
+		sight: '#8b5cf6',
+		park: '#22c55e',
+		shop: '#ec4899'
+	};
+
+	function escapeHtml(s: string) {
+		return s.replace(
+			/[&<>"']/g,
+			(c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!
+		);
+	}
+
+	function poiPinSvg(color: string) {
+		return `
+            <svg width="28" height="38" viewBox="0 0 28 38" xmlns="http://www.w3.org/2000/svg">
+                <path d="M14 0C6.3 0 0 6.3 0 14c0 10.5 14 24 14 24s14-13.5 14-24C28 6.3 21.7 0 14 0z"
+                    fill="${color}" stroke="#fff" stroke-width="2"/>
+                <circle cx="14" cy="14" r="5" fill="#fff"/>
+            </svg>`;
+	}
+
+	function createPoiLayer() {
+		const layer = L.layerGroup();
+
+		for (const p of data.pois) {
+			const icon = L.divIcon({
+				className: 'poi-marker',
+				html: poiPinSvg(categoryColors[p.category] ?? categoryColors.general),
+				iconSize: [28, 38],
+				iconAnchor: [14, 38],
+				popupAnchor: [0, -38]
+			});
+
+			const popupHtml = `
+				<div class="poi-popup">
+					${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" alt="${escapeHtml(p.name)}" />` : ''}
+					<h3>${escapeHtml(p.name)}</h3>
+					<span class="poi-category">${escapeHtml(p.category)}</span>
+					${p.description ? `<p>${escapeHtml(p.description)}</p>` : ''}
+				</div>`;
+
+			L.marker([p.latitude, p.longitude], { icon })
+				.bindPopup(popupHtml, { maxWidth: 260 })
+				.addTo(layer);
+		}
+
+		return layer;
+	}
+
+	// POIs ein-/ausblenden
+	$effect(() => {
+		// poiLayer zuerst lesen, damit Svelte es als Abhängigkeit trackt (map ist kein $state)
+		if (!poiLayer || !map) return;
+		if (showPois) poiLayer.addTo(map);
+		else poiLayer.remove();
+	});
 
 	// ---- SVG Pin-Icons ----
 	function pinSvg(color: string, label: string) {
@@ -89,6 +156,8 @@
 			endQuery = await reverseGeocode(endLat, endLon);
 		});
 
+		poiLayer = createPoiLayer();
+
 		fitToMarkers();
 
 		await initLocations();
@@ -108,6 +177,7 @@
 	}
 
 	onDestroy(() => {
+		poiLayer?.clearLayers();
 		map?.remove();
 	});
 
@@ -496,6 +566,13 @@
 				{/if}
 			</button>
 
+			{#if data.pois.length}
+				<label class="poi-toggle">
+					<input type="checkbox" bind:checked={showPois} />
+					POIs anzeigen ({data.pois.length})
+				</label>
+			{/if}
+
 			{#if error}
 				<div class="error">
 					<svg
@@ -659,6 +736,49 @@
 	}
 	.collapse-btn:hover {
 		background: rgba(0, 0, 0, 0.05);
+	}
+
+	.poi-toggle {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 0.9rem;
+		color: #444;
+		cursor: pointer;
+		padding: 2px 4px;
+	}
+
+	:global(.poi-marker) {
+		background: transparent;
+		border: none;
+	}
+	:global(.poi-popup) {
+		font-family: system-ui;
+		min-width: 180px;
+	}
+	:global(.poi-popup img) {
+		width: 100%;
+		height: 120px;
+		object-fit: cover;
+		border-radius: 6px;
+		margin-bottom: 0.5rem;
+	}
+	:global(.poi-popup h3) {
+		margin: 0 0 0.25rem;
+		font-size: 1rem;
+	}
+	:global(.poi-category) {
+		display: inline-block;
+		background: #eef2ff;
+		color: #4338ca;
+		padding: 0.15rem 0.5rem;
+		border-radius: 10px;
+		font-size: 0.75rem;
+	}
+	:global(.poi-popup p) {
+		margin: 0.5rem 0 0;
+		font-size: 0.85rem;
+		color: #444;
 	}
 
 	.panel-body {

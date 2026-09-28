@@ -1,6 +1,6 @@
 // src/lib/routeWithShadow.ts
 import { getRoutes, type RouteResponse } from './osrm';
-import { getBuildingsInRadius } from './overpass';
+import { getBuildingsInBBox } from './overpass';
 import { getShadowPolygon } from './sunCalc';
 import * as turf from '@turf/turf';
 import type { BBox, Feature, LineString, Polygon, MultiPolygon } from 'geojson';
@@ -28,10 +28,8 @@ const SHADOW_HALF_WIDTH_KM = 0.005;
 const SAMPLE_STEP_KM = 0.01;
 // Anzahl der OSRM-Alternativen zusätzlich zur Hauptroute
 const MAX_ALTERNATIVES = 3;
-// Ein Meter in der Sonne "kostet" so viel wie (1 + SUN_PENALTY) Meter im Schatten
-const SUN_PENALTY = 1;
-// Routen, die mehr als 50 % länger sind als die kürzeste, werden verworfen
-const MAX_DETOUR_FACTOR = 1.5;
+// Puffer um die Routen-Bounding-Box für die Gebäudeabfrage (= maximale Schattenlänge)
+const BBOX_BUFFER_KM = 0.3;
 
 export async function getRouteWithShadow(
 	startLat: number,
@@ -47,15 +45,18 @@ export async function getRouteWithShadow(
 	// 2. Bounding Box über alle Routen berechnen
 	const bounds = turf.bbox(turf.featureCollection(routeLines));
 
-	const centerLat = (bounds[1] + bounds[3]) / 2;
-	const centerLon = (bounds[0] + bounds[2]) / 2;
-
-	// Radius: halbe Diagonale der Bounding Box
-	const routeDistance = turf.distance([bounds[0], bounds[1]], [bounds[2], bounds[3]]);
-	const radiusKm = routeDistance / 2 + 0.5; // +0.5km Buffer
+	// Puffer: Gebäude bis zur maximalen Schattenlänge (300 m) neben der Route zählen
+	const bufferLat = BBOX_BUFFER_KM / 111;
+	const bufferLon =
+		BBOX_BUFFER_KM / (111 * Math.cos((((bounds[1] + bounds[3]) / 2) * Math.PI) / 180));
 
 	// 3. Gebäude entlang aller Routen einmalig abrufen
-	const buildings = await getBuildingsInRadius(centerLat, centerLon, radiusKm);
+	const buildings = await getBuildingsInBBox(
+		bounds[1] - bufferLat,
+		bounds[0] - bufferLon,
+		bounds[3] + bufferLat,
+		bounds[2] + bufferLon
+	);
 
 	// 4. Schatten berechnen: Streifen vom Gebäude bis zum Schattenpunkt
 	const shadowPolygons: ShadowPolygon[] = [];
@@ -86,17 +87,14 @@ export async function getRouteWithShadow(
 		geometry: route.geometry
 	}));
 
-	// 6. Route mit den geringsten Kosten wählen: Länge + Strafe für sonnige Meter
-	const shortest = Math.min(...alternatives.map((a) => a.distance));
+	// 6. Schattigste Route wählen (bei Gleichstand die kürzere)
 	let selectedIndex = 0;
-	let bestCost = Infinity;
-
 	alternatives.forEach((a, i) => {
-		if (a.distance > shortest * MAX_DETOUR_FACTOR) return;
-		const sunnyDistance = a.distance * (1 - a.shadowPercentage / 100);
-		const cost = a.distance + SUN_PENALTY * sunnyDistance;
-		if (cost < bestCost) {
-			bestCost = cost;
+		const best = alternatives[selectedIndex];
+		if (
+			a.shadowPercentage > best.shadowPercentage ||
+			(a.shadowPercentage === best.shadowPercentage && a.distance < best.distance)
+		) {
 			selectedIndex = i;
 		}
 	});
