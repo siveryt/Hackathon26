@@ -9,8 +9,8 @@
 	let endLat = $state(50.98);
 	let endLon = $state(7.05); // Bergheim
 
-	let startQuery = $state('Köln');
-	let endQuery = $state('Bergheim');
+	let startQuery = $state('Interaktiv Lab');
+	let endQuery = $state('Gymnasium Kerpen');
 
 	let loading = $state(false);
 	let result = $state<RouteWithShadowResult | null>(null);
@@ -90,7 +90,22 @@
 		});
 
 		fitToMarkers();
+
+		await initLocations();
 	});
+
+	async function initLocations() {
+		const [startRes] = await geocode('Interaktiv Lab Kerpen');
+		if (startRes) selectStart(startRes);
+
+		// kurz warten wegen Nominatim Rate-Limit (max 1 Anfrage/Sek)
+		await new Promise((r) => setTimeout(r, 1100));
+
+		const [endRes] = await geocode('Gymnasium Kerpen');
+		if (endRes) selectEnd(endRes);
+
+		fitToMarkers();
+	}
 
 	onDestroy(() => {
 		map?.remove();
