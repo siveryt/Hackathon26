@@ -43,6 +43,11 @@ export async function getBuildingsInRadius(
 	try {
 		const response = await fetch(OVERPASS_URL, {
 			method: 'POST',
+			// overpass-api.de lehnt generische User-Agents (z.B. Nodes "node") mit 406 ab
+			headers: {
+				'User-Agent': 'Hackathon26-ShadowRoute/0.1',
+				Accept: 'application/json'
+			},
 			body: new URLSearchParams({ data: query })
 		});
 

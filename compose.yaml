@@ -27,7 +27,7 @@ services:
       echo 'Checking for OSM data...' &&
       if [ ! -f nrw-latest.osrm.mldgr ]; then
         echo 'Processing OSM file (this may take 10 minutes)...' &&
-        osrm-extract --profile /opt/car.lua nrw-latest.osm.pbf &&
+        osrm-extract --profile /opt/foot.lua nrw-latest.osm.pbf &&
         echo 'Partitioning...' &&
         osrm-partition nrw-latest.osrm &&
         echo 'Customizing...' &&
