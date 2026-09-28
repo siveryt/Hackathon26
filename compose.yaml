@@ -1,6 +1,8 @@
+version: '3.8'
+
 services:
   db:
-    image: postgres
+    image: postgres:15
     restart: always
     ports:
       - 5432:5432
@@ -10,5 +12,28 @@ services:
       POSTGRES_DB: local
     volumes:
       - pgdata:/var/lib/postgresql
+
+  osrm:
+    image: osrm/osrm-backend:latest
+    restart: always
+    ports:
+      - 5000:5000
+    volumes:
+      - ./osrm-data:/data
+    command: >
+      sh -c "
+      if [ ! -f /data/germany-latest.osm.pbf ]; then
+        echo 'Downloading OSM data for Germany...';
+        wget -q https://download.geofabrik.de/europe/germany-latest.osm.pbf -O /data/germany-latest.osm.pbf;
+      fi &&
+      osrm-extract -p /opt/osrm/profiles/car.lua /data/germany-latest.osm.pbf &&
+      osrm-partition /data/germany-latest.osrm &&
+      osrm-customize /data/germany-latest.osrm &&
+      osrm-routed --algorithm=mld /data/germany-latest.osrm
+      "
+    environment:
+      - OSRM_ALGORITHM=mld
+
 volumes:
   pgdata:
+  osrm-data:
