@@ -593,15 +593,15 @@
 	}
 
 	.map {
-		position: fixed;
+		position: absolute; /* statt fixed */
 		inset: 0;
-		width: 100vw;
-		height: 100vh;
+		width: 100%; /* statt 100vw */
+		height: 100%; /* statt 100vh */
 		z-index: 0;
 	}
 
 	.floating-panel {
-		position: fixed;
+		position: absolute; /* statt fixed */
 		z-index: 1000;
 		background: rgba(255, 255, 255, 0.97);
 		backdrop-filter: blur(10px);
