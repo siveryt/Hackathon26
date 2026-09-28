@@ -1,42 +1,46 @@
-# sv
+# Hackathon26
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+SvelteKit + Tailwind + Drizzle (Postgres) + OSRM.
 
-## Creating a project
+## Voraussetzungen
 
-If you're seeing this, you've probably already done this step. Congrats!
+- [Node.js](https://nodejs.org) (LTS)
+- pnpm: `npm install -g pnpm`
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (muss laufen)
 
-```sh
-# create a new project
-npx sv create my-app
+## Starten (PowerShell)
+
+```powershell
+git clone <repo-url>
+cd Hackathon26
+pnpm install
+copy .env.example .env
 ```
 
-To recreate this project with the same configuration:
+DB + OSRM starten (eigenes Terminal offen lassen):
 
-```sh
-# recreate this project
-pnpm dlx sv@0.17.1 create --template minimal --types ts --add prettier eslint tailwindcss="plugins:typography,forms" sveltekit-adapter="adapter:auto" drizzle="database:postgresql+postgresql:postgres.js+docker:yes" --install pnpm Hackathon26
+```powershell
+pnpm db:start
 ```
 
-## Developing
+> Achtung: OSRM lädt beim ersten Start die Deutschland-Karte (~4 GB) und verarbeitet sie. Das dauert lange und braucht viel RAM. In Docker Desktop ggf. mehr Speicher geben.
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+DB-Schema pushen (einmalig bzw. nach Schema-Änderungen):
 
-```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+```powershell
+pnpm db:push
 ```
 
-## Building
+Dev-Server starten:
 
-To create a production version of your app:
-
-```sh
-npm run build
+```powershell
+pnpm dev
 ```
 
-You can preview the production build with `npm run preview`.
+→ http://localhost:5173
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+## Sonstiges
+
+- `pnpm db:studio` – DB im Browser anschauen
+- `pnpm check` – Typecheck
+- `pnpm format` – Code formatieren
